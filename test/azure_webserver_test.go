@@ -61,5 +61,4 @@ func TestAzureLinuxVMCreation(t *testing.T) {
 
 	// Confirm Ubuntu version
 	assert.Contains(t, *image.Sku, "22_04-lts-gen2")
-
 }
