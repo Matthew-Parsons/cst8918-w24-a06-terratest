@@ -2,6 +2,7 @@ package test
 
 import (
 	"testing"
+	"strings"
 
 	"github.com/gruntwork-io/terratest/modules/azure"
 	"github.com/gruntwork-io/terratest/modules/terraform"
@@ -37,28 +38,29 @@ func TestAzureLinuxVMCreation(t *testing.T) {
 	assert.True(t, azure.VirtualMachineExists(t, vmName, resourceGroupName, subscriptionID))
 
 	// Confirm NIC exists
-	nic := azure.GetNetworkInterface(t, nicName, resourceGroup, subscriptionID)
-	assert.Equal(t, nicName, *nic.Name)
+	assert.True(t, azure.NetworkInterfaceExists(t, nicName, resourceGroupName, subscriptionID))
 
 	// Confirm NIC is attached to the VM
-	vm := azure.GetVirtualMachine(t, vmName, resourceGroup, subscriptionID)
+	nicIDs, err := azure.GetVirtualMachineNicsE(vmName, resourceGroupName, subscriptionID)
+	assert.NoError(t, err)
 
 	found := false
-	for _, vmNic := range *vm.NetworkProfile.NetworkInterfaces {
-
-		if strings.Contains(*vmNic.ID, nicName) {
+	for _, id := range nicIDs {
+		if strings.Contains(id, nicName) {
 			found = true
 		}
 	}
+	assert.True(t, found, "NIC %s is not attached to VM %s", nicName, vmName)
 
-	assert.True(t, found, "NIC is not attached to VM")
-
-	// Confirm the VM uses Ubuntu
+	// Fetch VM object for image inspection
+	vm, err := azure.GetVirtualMachineE(vmName, resourceGroupName, subscriptionID)
+	assert.NoError(t, err)
+	
+	// Confirm VM uses Ubuntu publisher/offer
 	image := vm.StorageProfile.ImageReference
-
 	assert.Equal(t, "Canonical", *image.Publisher)
 	assert.Equal(t, "UbuntuServer", *image.Offer)
 
-	// Confirm Ubuntu version
+	// Confirm Ubuntu version contains expected SKU
 	assert.Contains(t, *image.Sku, "22_04-lts-gen2")
 }
